@@ -32,6 +32,9 @@ class Constants {
 	const SHARE_TYPE_CONTACT = 5; // ToDo Check if it is still in use otherwise remove it
 	const SHARE_TYPE_REMOTE = 6;  // ToDo Check if it is still in use otherwise remove it
 
+	const NODE_TYPE_FILE = 'file';
+	const NODE_TYPE_FOLDER = 'folder';
+
 	/**
 	 * Values for the "accepted" field of a share.
 	 */

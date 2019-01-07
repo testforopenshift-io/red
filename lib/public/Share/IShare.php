@@ -26,6 +26,7 @@ use OCP\Files\Folder;
 use OCP\Files\Node;
 use OCP\Files\NotFoundException;
 use OCP\Share\Exceptions\IllegalIDChangeException;
+use OCP\Share\ExtraPermissions\IPermission;
 
 /**
  * Interface IShare
@@ -183,6 +184,23 @@ interface IShare {
 	 * @since 9.0.0
 	 */
 	public function getPermissions();
+
+	/**
+	 * Set extra permissions
+	 *
+	 * @param IPermission[] $permissions
+	 * @since 10.2.0
+	 * @return \OCP\Share\IShare The modified object
+	 */
+	public function setExtraPermissions($permissions);
+
+	/**
+	 * Get extra permissions
+	 *
+	 * @return IPermission[]
+	 * @since 10.2.0
+	 */
+	public function getExtraPermissions();
 
 	/**
 	 * Set the expiration date

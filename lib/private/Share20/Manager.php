@@ -87,12 +87,6 @@ class Manager implements IManager {
 	private $connection;
 
 	/**
-	 * FIXME: Should be ExtraSharePermissionManager
-	 * @var array
-	 */
-	private $registeredExtraPermissionsMap;
-
-	/**
 	 * Manager constructor.
 	 *
 	 * @param ILogger $logger
@@ -135,7 +129,6 @@ class Manager implements IManager {
 		$this->eventDispatcher = $eventDispatcher;
 		$this->view = $view;
 		$this->connection = $connection;
-		$this->extraPermissionMap = array();
 	}
 
 	/**
@@ -643,7 +636,7 @@ class Manager implements IManager {
 		$run = true;
 		$error = '';
 		$preHookData = [
-			'itemType' => $share->getNode() instanceof \OCP\Files\File ? 'file' : 'folder',
+			'itemType' => $share->getNode() instanceof \OCP\Files\File ? \OCP\Share::NODE_TYPE_FILE : \OCP\Share::NODE_TYPE_FOLDER,
 			'itemSource' => $share->getNode()->getId(),
 			'shareType' => $share->getShareType(),
 			'uidOwner' => $share->getSharedBy(),
@@ -670,7 +663,7 @@ class Manager implements IManager {
 
 		// Post share hook
 		$postHookData = [
-			'itemType' => $share->getNode() instanceof \OCP\Files\File ? 'file' : 'folder',
+			'itemType' => $share->getNode() instanceof \OCP\Files\File ? \OCP\Share::NODE_TYPE_FILE : \OCP\Share::NODE_TYPE_FOLDER,
 			'itemSource' => $share->getNode()->getId(),
 			'shareType' => $share->getShareType(),
 			'uidOwner' => $share->getSharedBy(),
@@ -876,7 +869,7 @@ class Manager implements IManager {
 		$update = false;
 		if ($expirationDateUpdated === true) {
 			\OC_Hook::emit('OCP\Share', 'post_set_expiration_date', [
-				'itemType' => $share->getNode() instanceof \OCP\Files\File ? 'file' : 'folder',
+				'itemType' => $share->getNode() instanceof \OCP\Files\File ? \OCP\Share::NODE_TYPE_FILE : \OCP\Share::NODE_TYPE_FOLDER,
 				'itemSource' => $share->getNode()->getId(),
 				'date' => $share->getExpirationDate(),
 				'uidOwner' => $share->getSharedBy(),
@@ -888,7 +881,7 @@ class Manager implements IManager {
 
 		if ($share->getPassword() !== $originalShare->getPassword()) {
 			\OC_Hook::emit('OCP\Share', 'post_update_password', [
-				'itemType' => $share->getNode() instanceof \OCP\Files\File ? 'file' : 'folder',
+				'itemType' => $share->getNode() instanceof \OCP\Files\File ? \OCP\Share::NODE_TYPE_FILE : \OCP\Share::NODE_TYPE_FOLDER,
 				'itemSource' => $share->getNode()->getId(),
 				'uidOwner' => $share->getSharedBy(),
 				'token' => $share->getToken(),
@@ -905,7 +898,7 @@ class Manager implements IManager {
 				$userFolder = $this->rootFolder->getUserFolder($share->getSharedBy());
 			}
 			\OC_Hook::emit('OCP\Share', 'post_update_permissions', [
-				'itemType' => $share->getNode() instanceof \OCP\Files\File ? 'file' : 'folder',
+				'itemType' => $share->getNode() instanceof \OCP\Files\File ? \OCP\Share::NODE_TYPE_FILE : \OCP\Share::NODE_TYPE_FOLDER,
 				'itemSource' => $share->getNode()->getId(),
 				'shareType' => $share->getShareType(),
 				'shareWith' => $share->getSharedWith(),
@@ -1549,37 +1542,5 @@ class Manager implements IManager {
 	 */
 	public function outgoingServer2ServerSharesAllowed() {
 		return $this->config->getAppValue('files_sharing', 'outgoing_server2server_share_enabled', 'yes') === 'yes';
-	}
-
-	public function registerExtraPermission($app, $permission, $permissionLabel, $permissionNotification) {
-		$this->registeredExtraPermissionsMap[$app][$permission]['label'] = $permissionLabel;
-		$this->registeredExtraPermissionsMap[$app][$permission]['notification'] = $permissionNotification;
-	}
-
-	public function getExtraPermissionApps() {
-		return \array_keys($this->registeredExtraPermissionsMap);
-	}
-
-	public function getExtraPermissionKeys($app) {
-		if (array_key_exists($app, $this->registeredExtraPermissionsMap)) {
-			return \array_keys($this->registeredExtraPermissionsMap[$app]);
-		}
-		return [];
-	}
-
-	public function getExtraPermissionLabel($app, $permission) {
-		if (array_key_exists($app, $this->registeredExtraPermissionsMap) &&
-			array_key_exists($permission, $this->registeredExtraPermissionsMap[$app])) {
-			return $this->registeredExtraPermissionsMap[$app][$permission]['label'];
-		}
-		return null;
-	}
-
-	public function getExtraPermissionNotification($app, $permission) {
-		if (array_key_exists($app, $this->registeredExtraPermissionsMap) &&
-			array_key_exists($permission, $this->registeredExtraPermissionsMap[$app])) {
-			return $this->registeredExtraPermissionsMap[$app][$permission]['notification'];
-		}
-		return null;
 	}
 }

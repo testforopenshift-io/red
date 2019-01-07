@@ -21,9 +21,10 @@
 namespace OC\Share20\ExtraPermissions;
 
 use OCP\Share\ExtraPermissions\IManager;
+use OCP\Share\IShare;
 
 /**
- * This class is the communication hub for all sharing related operations.
+ * @inheritdoc
  */
 class Manager implements IManager {
 
@@ -40,35 +41,91 @@ class Manager implements IManager {
 		$this->registeredExtraPermissionsMap = array();
 	}
 
-	public function registerExtraPermission($app, $permission, $permissionLabel, $permissionNotification) {
-		$this->registeredExtraPermissionsMap[$app][$permission]['label'] = $permissionLabel;
-		$this->registeredExtraPermissionsMap[$app][$permission]['notification'] = $permissionNotification;
+	/**
+	 * @inheritdoc
+	 */
+	public function registerExtraPermission($appId, $permissionId, $permissionLabel, $permissionDescription) {
+		$this->registeredExtraPermissionsMap[$appId][$permissionId]['label'] = $permissionLabel;
+		$this->registeredExtraPermissionsMap[$appId][$permissionId]['description'] = $permissionDescription;
+		$this->registeredExtraPermissionsMap[$appId][$permissionId]['nodeTypeFilter'] = [];
+		$this->registeredExtraPermissionsMap[$appId][$permissionId]['shareTypeFilter'] = [];
+
+		return true;
 	}
 
+	/**
+	 * @inheritdoc
+	 */
+	public function registerAllowedNodeType($appId, $permissionId, $nodeTypeFilter){
+		$this->registeredExtraPermissionsMap[$appId][$permissionId]['nodeTypeFilter'] = $nodeTypeFilter;
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	public function registerAllowedShareType($appId, $permissionId, $shareTypeFilter){
+		$this->registeredExtraPermissionsMap[$appId][$permissionId]['shareTypeFilter'] = $shareTypeFilter;
+	}
+
+	/**
+	 * @inheritdoc
+	 */
 	public function getExtraPermissionApps() {
 		return \array_keys($this->registeredExtraPermissionsMap);
 	}
 
-	public function getExtraPermissionKeys($app) {
-		if (array_key_exists($app, $this->registeredExtraPermissionsMap)) {
-			return \array_keys($this->registeredExtraPermissionsMap[$app]);
+	/**
+	 * @inheritdoc
+	 */
+	public function getExtraPermissionKeys($appId) {
+		if (array_key_exists($appId, $this->registeredExtraPermissionsMap)) {
+			return \array_keys($this->registeredExtraPermissionsMap[$appId]);
 		}
 		return [];
 	}
 
-	public function getExtraPermissionLabel($app, $permission) {
-		if (array_key_exists($app, $this->registeredExtraPermissionsMap) &&
-			array_key_exists($permission, $this->registeredExtraPermissionsMap[$app])) {
-			return $this->registeredExtraPermissionsMap[$app][$permission]['label'];
+	/**
+	 * @inheritdoc
+	 */
+	public function getRegisteredLabel($appId, $permissionId) {
+		if (array_key_exists($appId, $this->registeredExtraPermissionsMap) &&
+			array_key_exists($permissionId, $this->registeredExtraPermissionsMap[$appId])) {
+			return $this->registeredExtraPermissionsMap[$appId][$permissionId]['label'];
 		}
 		return null;
 	}
 
-	public function getExtraPermissionNotification($app, $permission) {
-		if (array_key_exists($app, $this->registeredExtraPermissionsMap) &&
-			array_key_exists($permission, $this->registeredExtraPermissionsMap[$app])) {
-			return $this->registeredExtraPermissionsMap[$app][$permission]['notification'];
+	/**
+	 * @inheritdoc
+	 */
+	public function getRegisteredDescription($appId, $permissionId) {
+		if (array_key_exists($appId, $this->registeredExtraPermissionsMap) &&
+			array_key_exists($permissionId, $this->registeredExtraPermissionsMap[$appId])) {
+			return $this->registeredExtraPermissionsMap[$appId][$permissionId]['description'];
 		}
 		return null;
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	public function isNodeTypeAllowed($appId, $permissionId, $nodeType) {
+		// FIXME: implement
+		return true;
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	public function isShareTypeAllowed($appId, $permissionId, $shareType) {
+		// FIXME: implement
+		return true;
+	}
+
+	/**
+	 * @inheritdoc
+	 */
+	public function newPermission() {
+		return new Permission();
 	}
 }

@@ -167,6 +167,8 @@ class MountProvider implements IMountProvider {
 				->setTarget($baseShare->getTarget());
 
 			// use most permissive permissions
+			// this covers the case where there are multiple shares for the same file
+			// e.g. from different groups and different permissions
 			$permissions = 0;
 			foreach ($shares as $share) {
 				$permissions |= $share->getPermissions();
@@ -194,10 +196,9 @@ class MountProvider implements IMountProvider {
 			}
 			$superShare->setPermissions($permissions);
 
+			// FIXME: might need to add all extra permissions for all grouped shares, for now it is "random"
 			// super share gets extra permission of first entry
-			if ($superShare instanceof \OC\Share20\Share && $baseShare instanceof \OC\Share20\Share) {
-				$superShare->setExtraPermissions($baseShare->getExtraPermissions());
-			}
+			$superShare->setExtraPermissions($baseShare->getExtraPermissions());
 
 			$result[] = [$superShare, $shares];
 		}

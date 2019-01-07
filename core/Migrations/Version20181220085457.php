@@ -13,7 +13,7 @@ class Version20181220085457 implements ISchemaMigration {
 	public function changeSchema(Schema $schema, array $options) {
 		$prefix = $options['tablePrefix'];
 
-		// FIXME: probably should be another table - temporarly use JSON field for the sake of POC
+		// FIXME: Should Type::TEXT or Type::JSON be used?
 		if ($schema->hasTable("${prefix}share")) {
 			$shareTable = $schema->getTable("${prefix}share");
 
@@ -22,9 +22,9 @@ class Version20181220085457 implements ISchemaMigration {
 					'extra_permissions',
 					Type::STRING,
 					[
-						'default' => '{}',
-						'length' => 255,
-						'notnull' => true
+						'default' => null,
+						'length' => 4096,
+						'notnull' => false
 					]
 				);
 			}

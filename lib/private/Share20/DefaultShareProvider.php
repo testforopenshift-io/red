@@ -25,7 +25,10 @@
  */
 namespace OC\Share20;
 
+use OC\Share20\ExtraPermissions\Permission;
 use OCP\Files\File;
+use OCP\Share\ExtraPermissions\IManager as IExtraPermissionsManager;
+use OCP\Share\ExtraPermissions\IPermission;
 use OCP\Share\IShare;
 use OCP\Share\IShareProvider;
 use OC\Share20\Exception\InvalidShare;
@@ -39,7 +42,6 @@ use OCP\IUserManager;
 use OCP\Files\IRootFolder;
 use OCP\IDBConnection;
 use OCP\Files\Node;
-use OC\Share20\ExtraPermissions\Permissions as ExtraSharePermissions;
 
 /**
  * Class DefaultShareProvider
@@ -62,6 +64,9 @@ class DefaultShareProvider implements IShareProvider {
 
 	/** @var IRootFolder */
 	private $rootFolder;
+
+	/** @var IExtraPermissionsManager */
+	private $extraPermissionsManager;
 
 	/**
 	 * DefaultShareProvider constructor.
@@ -142,15 +147,10 @@ class DefaultShareProvider implements IShareProvider {
 		// Set what is shares
 		$qb->setValue('item_type', $qb->createParameter('itemType'));
 		if ($share->getNode() instanceof \OCP\Files\File) {
-			$qb->setParameter('itemType', 'file');
+			$qb->setParameter('itemType', \OCP\Share::NODE_TYPE_FILE);
 		} else {
-			$qb->setParameter('itemType', 'folder');
+			$qb->setParameter('itemType', \OCP\Share::NODE_TYPE_FOLDER);
 		}
-
-		// No extra share permissions are set during share create
-		// Setting extra share permissions is only allowed at update
-		$shareExtraPermissions = new ExtraSharePermissions();
-		$qb->setValue('extra_permissions', $qb->createNamedParameter($shareExtraPermissions->serialize()));
 
 		// Set the file id
 		$qb->setValue('item_source', $qb->createNamedParameter($share->getNode()->getId()));
@@ -205,11 +205,9 @@ class DefaultShareProvider implements IShareProvider {
 	public function update(\OCP\Share\IShare $share) {
 		$this->validate($share);
 
-		if ($share instanceof \OC\Share20\Share) {
-			$extraSharePermissions = $share->getExtraPermissions();
-		} else {
-			$extraSharePermissions = new ExtraSharePermissions();
-		}
+		$extraSharePermissions = $this->formatExtraPermissions(
+			$share->getExtraPermissions()
+		);
 
 		if ($share->getShareType() === \OCP\Share::SHARE_TYPE_USER) {
 			/*
@@ -222,7 +220,7 @@ class DefaultShareProvider implements IShareProvider {
 				->set('uid_owner', $qb->createNamedParameter($share->getShareOwner()))
 				->set('uid_initiator', $qb->createNamedParameter($share->getSharedBy()))
 				->set('permissions', $qb->createNamedParameter($share->getPermissions()))
-				->set('extra_permissions', $qb->createNamedParameter($extraSharePermissions->serialize()))
+				->set('extra_permissions', $qb->createNamedParameter($extraSharePermissions))
 				->set('item_source', $qb->createNamedParameter($share->getNode()->getId()))
 				->set('file_source', $qb->createNamedParameter($share->getNode()->getId()))
 				->set('accepted', $qb->createNamedParameter($share->getState()))
@@ -235,7 +233,7 @@ class DefaultShareProvider implements IShareProvider {
 				->set('uid_owner', $qb->createNamedParameter($share->getShareOwner()))
 				->set('uid_initiator', $qb->createNamedParameter($share->getSharedBy()))
 				->set('permissions', $qb->createNamedParameter($share->getPermissions()))
-				->set('extra_permissions', $qb->createNamedParameter($extraSharePermissions->serialize()))
+				->set('extra_permissions', $qb->createNamedParameter($extraSharePermissions))
 				->set('item_source', $qb->createNamedParameter($share->getNode()->getId()))
 				->set('file_source', $qb->createNamedParameter($share->getNode()->getId()))
 				->set('accepted', $qb->createNamedParameter($share->getState()))
@@ -261,7 +259,7 @@ class DefaultShareProvider implements IShareProvider {
 			$qb->update('share')
 				->where($qb->expr()->eq('parent', $qb->createNamedParameter($share->getId())))
 				->set('permissions', $qb->createNamedParameter($share->getPermissions()))
-				->set('extra_permissions', $qb->createNamedParameter($extraSharePermissions->serialize()))
+				->set('extra_permissions', $qb->createNamedParameter($extraSharePermissions))
 				->execute();
 		} elseif ($share->getShareType() === \OCP\Share::SHARE_TYPE_LINK) {
 			$qb = $this->dbConn->getQueryBuilder();
@@ -271,7 +269,7 @@ class DefaultShareProvider implements IShareProvider {
 				->set('uid_owner', $qb->createNamedParameter($share->getShareOwner()))
 				->set('uid_initiator', $qb->createNamedParameter($share->getSharedBy()))
 				->set('permissions', $qb->createNamedParameter($share->getPermissions()))
-				->set('extra_permissions', $qb->createNamedParameter($extraSharePermissions->serialize()))
+				->set('extra_permissions', $qb->createNamedParameter($extraSharePermissions))
 				->set('item_source', $qb->createNamedParameter($share->getNode()->getId()))
 				->set('file_source', $qb->createNamedParameter($share->getNode()->getId()))
 				->set('token', $qb->createNamedParameter($share->getToken()))
@@ -308,8 +306,8 @@ class DefaultShareProvider implements IShareProvider {
 				)
 			)
 			->andWhere($qb->expr()->orX(
-				$qb->expr()->eq('item_type', $qb->createNamedParameter('file')),
-				$qb->expr()->eq('item_type', $qb->createNamedParameter('folder'))
+				$qb->expr()->eq('item_type', $qb->createNamedParameter(\OCP\Share::NODE_TYPE_FILE)),
+				$qb->expr()->eq('item_type', $qb->createNamedParameter(\OCP\Share::NODE_TYPE_FOLDER))
 			))
 			->orderBy('id');
 
@@ -404,8 +402,8 @@ class DefaultShareProvider implements IShareProvider {
 				->andWhere($qb->expr()->eq('share_with', $qb->createNamedParameter($recipient)))
 				->andWhere($qb->expr()->eq('parent', $qb->createNamedParameter($share->getId())))
 				->andWhere($qb->expr()->orX(
-					$qb->expr()->eq('item_type', $qb->createNamedParameter('file')),
-					$qb->expr()->eq('item_type', $qb->createNamedParameter('folder'))
+					$qb->expr()->eq('item_type', $qb->createNamedParameter(\OCP\Share::NODE_TYPE_FILE)),
+					$qb->expr()->eq('item_type', $qb->createNamedParameter(\OCP\Share::NODE_TYPE_FOLDER))
 				))
 				->setMaxResults(1)
 				->execute();
@@ -413,6 +411,9 @@ class DefaultShareProvider implements IShareProvider {
 			$data = $stmt->fetch();
 			$stmt->closeCursor();
 
+			$extraSharePermissions = $this->formatExtraPermissions(
+				$share->getExtraPermissions()
+			);
 			if ($data === false) {
 				// No usergroup share yet. Create one.
 				$qb = $this->dbConn->getQueryBuilder();
@@ -423,11 +424,12 @@ class DefaultShareProvider implements IShareProvider {
 						'uid_owner' => $qb->createNamedParameter($share->getShareOwner()),
 						'uid_initiator' => $qb->createNamedParameter($share->getSharedBy()),
 						'parent' => $qb->createNamedParameter($share->getId()),
-						'item_type' => $qb->createNamedParameter($share->getNode() instanceof File ? 'file' : 'folder'),
+						'item_type' => $qb->createNamedParameter($share->getNode() instanceof File ? \OCP\Share::NODE_TYPE_FILE : \OCP\Share::NODE_TYPE_FOLDER),
 						'item_source' => $qb->createNamedParameter($share->getNode()->getId()),
 						'file_source' => $qb->createNamedParameter($share->getNode()->getId()),
 						'file_target' => $qb->createNamedParameter($share->getTarget()),
 						'permissions' => $qb->createNamedParameter($share->getPermissions()),
+						'extra_permissions' => $qb->createNamedParameter($extraSharePermissions),
 						'stime' => $qb->createNamedParameter($share->getShareTime()->getTimestamp()),
 						'accepted' => $qb->createNamedParameter($share->getState()),
 					])->execute();
@@ -440,6 +442,7 @@ class DefaultShareProvider implements IShareProvider {
 					// make sure to reset the permissions to the one of the parent share,
 					// as legacy entries with zero permissions might still exist
 					->set('permissions', $qb->createNamedParameter($share->getPermissions()))
+					->set('extra_permissions', $qb->createNamedParameter($extraSharePermissions))
 					->where($qb->expr()->eq('id', $qb->createNamedParameter($data['id'])))
 					->execute();
 			}
@@ -462,8 +465,8 @@ class DefaultShareProvider implements IShareProvider {
 			$qb->select('*')
 				->from('share')
 				->andWhere($qb->expr()->orX(
-					$qb->expr()->eq('item_type', $qb->createNamedParameter('file')),
-					$qb->expr()->eq('item_type', $qb->createNamedParameter('folder'))
+					$qb->expr()->eq('item_type', $qb->createNamedParameter(\OCP\Share::NODE_TYPE_FILE)),
+					$qb->expr()->eq('item_type', $qb->createNamedParameter(\OCP\Share::NODE_TYPE_FOLDER))
 				));
 
 			$orX = $qb->expr()->orX();
@@ -511,8 +514,8 @@ class DefaultShareProvider implements IShareProvider {
 		$qb->select('*')
 			->from('share')
 			->andWhere($qb->expr()->orX(
-				$qb->expr()->eq('item_type', $qb->createNamedParameter('file')),
-				$qb->expr()->eq('item_type', $qb->createNamedParameter('folder'))
+				$qb->expr()->eq('item_type', $qb->createNamedParameter(\OCP\Share::NODE_TYPE_FILE)),
+				$qb->expr()->eq('item_type', $qb->createNamedParameter(\OCP\Share::NODE_TYPE_FOLDER))
 			));
 
 		$qb->andWhere($qb->expr()->eq('share_type', $qb->createNamedParameter($shareType)));
@@ -572,8 +575,8 @@ class DefaultShareProvider implements IShareProvider {
 				)
 			)
 			->andWhere($qb->expr()->orX(
-				$qb->expr()->eq('item_type', $qb->createNamedParameter('file')),
-				$qb->expr()->eq('item_type', $qb->createNamedParameter('folder'))
+				$qb->expr()->eq('item_type', $qb->createNamedParameter(\OCP\Share::NODE_TYPE_FILE)),
+				$qb->expr()->eq('item_type', $qb->createNamedParameter(\OCP\Share::NODE_TYPE_FOLDER))
 			));
 		
 		$cursor = $qb->execute();
@@ -624,8 +627,8 @@ class DefaultShareProvider implements IShareProvider {
 				)
 			)
 			->andWhere($qb->expr()->orX(
-				$qb->expr()->eq('item_type', $qb->createNamedParameter('file')),
-				$qb->expr()->eq('item_type', $qb->createNamedParameter('folder'))
+				$qb->expr()->eq('item_type', $qb->createNamedParameter(\OCP\Share::NODE_TYPE_FILE)),
+				$qb->expr()->eq('item_type', $qb->createNamedParameter(\OCP\Share::NODE_TYPE_FOLDER))
 			))
 			->execute();
 
@@ -679,8 +682,8 @@ class DefaultShareProvider implements IShareProvider {
 		$qb->where($qb->expr()->eq('share_type', $qb->createNamedParameter(\OCP\Share::SHARE_TYPE_USER)))
 			->andWhere($qb->expr()->eq('share_with', $qb->createNamedParameter($userId)))
 			->andWhere($qb->expr()->orX(
-				$qb->expr()->eq('item_type', $qb->createNamedParameter('file')),
-				$qb->expr()->eq('item_type', $qb->createNamedParameter('folder'))
+				$qb->expr()->eq('item_type', $qb->createNamedParameter(\OCP\Share::NODE_TYPE_FILE)),
+				$qb->expr()->eq('item_type', $qb->createNamedParameter(\OCP\Share::NODE_TYPE_FOLDER))
 			));
 
 		// Filter by node if provided
@@ -722,8 +725,8 @@ class DefaultShareProvider implements IShareProvider {
 				IQueryBuilder::PARAM_STR_ARRAY
 			)))
 			->andWhere($qb->expr()->orX(
-				$qb->expr()->eq('item_type', $qb->createNamedParameter('file')),
-				$qb->expr()->eq('item_type', $qb->createNamedParameter('folder'))
+				$qb->expr()->eq('item_type', $qb->createNamedParameter(\OCP\Share::NODE_TYPE_FILE)),
+				$qb->expr()->eq('item_type', $qb->createNamedParameter(\OCP\Share::NODE_TYPE_FOLDER))
 			));
 
 		return $qb;
@@ -932,8 +935,8 @@ class DefaultShareProvider implements IShareProvider {
 			->where($qb->expr()->eq('share_type', $qb->createNamedParameter(\OCP\Share::SHARE_TYPE_LINK)))
 			->andWhere($qb->expr()->eq('token', $qb->createNamedParameter($token)))
 			->andWhere($qb->expr()->orX(
-				$qb->expr()->eq('item_type', $qb->createNamedParameter('file')),
-				$qb->expr()->eq('item_type', $qb->createNamedParameter('folder'))
+				$qb->expr()->eq('item_type', $qb->createNamedParameter(\OCP\Share::NODE_TYPE_FILE)),
+				$qb->expr()->eq('item_type', $qb->createNamedParameter(\OCP\Share::NODE_TYPE_FOLDER))
 			))
 			->execute();
 
@@ -951,7 +954,7 @@ class DefaultShareProvider implements IShareProvider {
 
 		return $share;
 	}
-	
+
 	/**
 	 * Create a share object from an database row
 	 *
@@ -971,9 +974,8 @@ class DefaultShareProvider implements IShareProvider {
 		$shareTime->setTimestamp((int)$data['stime']);
 		$share->setShareTime($shareTime);
 
-		$shareExtraPermissions = new ExtraSharePermissions();
-		$shareExtraPermissions->load($data['extra_permissions']);
-		$share->setExtraPermissions($shareExtraPermissions);
+		$extraPermissions = $this->loadExtraPermissions($data['extra_permissions']);
+		$share->setExtraPermissions($extraPermissions);
 
 		if ($share->getShareType() === \OCP\Share::SHARE_TYPE_USER) {
 			$share->setSharedWith($data['share_with']);
@@ -1064,8 +1066,8 @@ class DefaultShareProvider implements IShareProvider {
 				->andWhere($qb->expr()->eq('share_type', $qb->createNamedParameter(self::SHARE_TYPE_USERGROUP)))
 				->andWhere($qb->expr()->eq('share_with', $qb->createNamedParameter($userId)))
 				->andWhere($qb->expr()->orX(
-					$qb->expr()->eq('item_type', $qb->createNamedParameter('file')),
-					$qb->expr()->eq('item_type', $qb->createNamedParameter('folder'))
+					$qb->expr()->eq('item_type', $qb->createNamedParameter(\OCP\Share::NODE_TYPE_FILE)),
+					$qb->expr()->eq('item_type', $qb->createNamedParameter(\OCP\Share::NODE_TYPE_FOLDER))
 				));
 
 			$stmt = $qb->execute();
@@ -1258,5 +1260,45 @@ class DefaultShareProvider implements IShareProvider {
 		}
 
 		// TODO: add more early validation for fields instead of relying on the DB
+	}
+
+	/**
+	 * Load JSON string and convert into IPermission[]
+	 *
+	 * @param string $data
+	 * @return IPermission[]
+	 */
+	private function loadExtraPermissions($data) {
+		$extraPermissions = [];
+		if (!is_null($data)) {
+			$extraPermissionsJson = json_decode($data, true);
+			foreach($extraPermissionsJson as $perm) {
+				$permission = new Permission();
+				$permission->setId($perm['id'])
+					->setApp($perm['appId']);
+				$extraPermissions[] = $permission;
+			}
+		}
+
+		return $extraPermissions;
+	}
+
+	/**
+	 * @param IPermission[] $permissions
+	 * @return string|null
+	 */
+	private function formatExtraPermissions($permissions) {
+		if (empty($permissions)) {
+			return null;
+		}
+
+		$result = [];
+		foreach($permissions as $perm) {
+			$formattedPermission = [];
+			$formattedPermission['id'] = $perm->getId();
+			$formattedPermission['appId'] = $perm->getApp();
+			$result[] = $formattedPermission;
+		}
+		return json_encode($result);
 	}
 }

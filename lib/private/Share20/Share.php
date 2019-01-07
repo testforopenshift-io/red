@@ -28,7 +28,7 @@ use OCP\Files\NotFoundException;
 use OCP\IUserManager;
 use OCP\Share\Exceptions\IllegalIDChangeException;
 use OC\Share\Constants;
-use OC\Share20\ExtraPermissions\Permissions as ExtraSharePermissions;
+use OCP\Share\ExtraPermissions\IPermission;
 
 class Share implements \OCP\Share\IShare {
 
@@ -52,7 +52,7 @@ class Share implements \OCP\Share\IShare {
 	private $shareOwner;
 	/** @var int */
 	private $permissions;
-	/** @var ExtraSharePermissions */
+	/** @var IPermission[] */
 	private $extraPermissions;
 	/** @var \DateTime */
 	private $expireDate;
@@ -202,7 +202,7 @@ class Share implements \OCP\Share\IShare {
 	 * @inheritdoc
 	 */
 	public function setNodeType($type) {
-		if ($type !== 'file' && $type !== 'folder') {
+		if ($type !== \OCP\Share::NODE_TYPE_FILE && $type !== \OCP\Share::NODE_TYPE_FOLDER) {
 			throw new \InvalidArgumentException();
 		}
 
@@ -216,7 +216,7 @@ class Share implements \OCP\Share\IShare {
 	public function getNodeType() {
 		if ($this->nodeType === null) {
 			$node = $this->getNode();
-			$this->nodeType = $node instanceof File ? 'file' : 'folder';
+			$this->nodeType = $node instanceof File ? \OCP\Share::NODE_TYPE_FILE : \OCP\Share::NODE_TYPE_FOLDER;
 		}
 
 		return $this->nodeType;
@@ -273,11 +273,7 @@ class Share implements \OCP\Share\IShare {
 	}
 
 	/**
-	 * Set extra permissions
-	 *
-	 * @param ExtraSharePermissions
-	 * @since 11.0.0
-	 * @return \OC\Share20\Share
+	 * @inheritdoc
 	 */
 	public function setExtraPermissions($permissions) {
 		$this->extraPermissions = $permissions;
@@ -285,10 +281,7 @@ class Share implements \OCP\Share\IShare {
 	}
 
 	/**
-	 * Get extra permissions
-	 *
-	 * @return ExtraSharePermissions
-	 * @since 11.0.0
+	 * @inheritdoc
 	 */
 	public function getExtraPermissions() {
 		return $this->extraPermissions;

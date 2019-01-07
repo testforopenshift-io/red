@@ -100,13 +100,18 @@ class ViewOnlyPlugin extends ServerPlugin {
 			// Extract extra permissions
 			/** @var \OCA\Files_Sharing\SharedStorage $storage */
 			$share = $storage->getShare();
-			if (!($share instanceof \OC\Share20\Share)) {
-				return true;
-			}
 			$extraPermissions = $share->getExtraPermissions();
 
 			// Restrict view-only to shares without update permission (read-only) and when view-only is enabled
-			if (!$file->isUpdateable() && $extraPermissions->hasExtraPermission('dav', 'view-only')) {
+			$isViewOnly = false;
+			foreach($extraPermissions as $extraPermission) {
+				if ($extraPermission->getApp() === 'dav' && $extraPermission->getId() === 'view-only') {
+					$isViewOnly = true;
+					break;
+				}
+			}
+			$isReadOnly = !$file->isUpdateable();
+			if ($isReadOnly && $isViewOnly) {
 				throw new Forbidden('File is in secure-view mode and cannot be directly downloaded.');
 			}
 		} catch (NotFound $e) {
@@ -118,11 +123,24 @@ class ViewOnlyPlugin extends ServerPlugin {
 	}
 
 	public function registerExtraPermissions() {
+		// TODO: move to IOnlineEditorManager so that other apps can have access to this permission
+		// TODO: Check PreviewPlugin for details
 		$this->extraSharePermissionsManager->registerExtraPermission(
 			'dav',
 			'view-only',
 			'enable view only',
 			'With read-only permission set for the file, download will be disabled. Only viewing will be allowed'
+		);
+
+		$this->extraSharePermissionsManager->registerAllowedNodeType(
+			'dav',
+			'view-only',
+			[\OCP\Share::NODE_TYPE_FILE]
+		);
+		$this->extraSharePermissionsManager->registerAllowedNodeType(
+			'dav',
+			'view-only',
+			[\OCP\Share::SHARE_TYPE_USER, \OCP\Share::SHARE_TYPE_GROUP]
 		);
 	}
 }

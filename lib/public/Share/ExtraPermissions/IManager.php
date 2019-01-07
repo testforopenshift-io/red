@@ -21,49 +21,91 @@
 namespace OCP\Share\ExtraPermissions;
 
 /**
- * Interface IManager
+ * This class manages registration of extra share permissions
  *
  * @package OCP\Share\ExtraPermissions
- * @since 11.0.0
+ * @since 10.2.0
  */
 interface IManager {
 
 	/**
-	 * @param $app
-	 * @param $permission
-	 * @param $permissionLabel
-	 * @param $permissionNotification
-	 * @since 11.0.0
+	 * @param string $appId
+	 * @param string $permissionId
+	 * @param string $permissionLabel
+	 * @param string $permissionDescription
+	 * @return bool
+	 * @since 10.2.0
 	 */
-	public function registerExtraPermission($app, $permission, $permissionLabel, $permissionNotification);
+	public function registerExtraPermission($appId, $permissionId, $permissionLabel, $permissionDescription);
+
+	/**
+	 * @param string $appId
+	 * @param string $permissionId
+	 * @param string[] $nodeTypeFilter
+	 * @return bool
+	 * @since 10.2.0
+	 */
+	public function registerAllowedNodeType($appId, $permissionId, $nodeTypeFilter);
+
+	/**
+	 * @param string $appId
+	 * @param string $permissionId
+	 * @param string[] $shareTypeFilter
+	 * @return bool
+	 * @since 10.2.0
+	 */
+	public function registerAllowedShareType($appId, $permissionId, $shareTypeFilter);
+
+	/**
+	 * @param string $appId
+	 * @param string $permissionId
+	 * @param string $nodeType
+	 * @return bool
+	 * @since 10.2.0
+	 */
+	public function isNodeTypeAllowed($appId, $permissionId, $nodeType);
+
+	/**
+	 * @param string $appId
+	 * @param string $permissionId
+	 * @param string $shareType
+	 * @return bool
+	 * @since 10.2.0
+	 */
+	public function isShareTypeAllowed($appId, $permissionId, $shareType);
 
 	/**
 	 * @return string[]
-	 * @since 11.0.0
+	 * @since 10.2.0
 	 */
 	public function getExtraPermissionApps();
 
 	/**
-	 * @param string $app
+	 * @param string $appId
 	 * @return string[]
-	 * @since 11.0.0
+	 * @since 10.2.0
 	 */
-	public function getExtraPermissionKeys($app);
+	public function getExtraPermissionKeys($appId);
 
 	/**
-	 * @param string $app
-	 * @param string $permission
+	 * @param string $appId
+	 * @param string $permissionId
 	 * @return string
-	 * @since 11.0.0
+	 * @since 10.2.0
 	 */
-	public function getExtraPermissionLabel($app, $permission);
+	public function getRegisteredLabel($appId, $permissionId);
 
 	/**
-	 * @param string $app
-	 * @param string $permission
+	 * @param string $appId
+	 * @param string $permissionId
 	 * @return string
-	 * @since 11.0.0
+	 * @since 10.2.0
 	 */
-	public function getExtraPermissionNotification($app, $permission);
+	public function getRegisteredDescription($appId, $permissionId);
 
+	/**
+	 * @return IPermission
+	 * @since 10.2.0
+	 */
+	public function newPermission();
 }

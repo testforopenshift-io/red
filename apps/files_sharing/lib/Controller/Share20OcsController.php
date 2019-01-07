@@ -131,41 +131,54 @@ class Share20OcsController extends OCSController {
 		return null;
 	}
 
-	private function extractExtraPermissions($formattedShareExtraPermissions) {
-		$shareExtraPermissions = new ExtraSharePermissions();
-		foreach($formattedShareExtraPermissions as $permission) {
-			$permissionEnabled = json_decode($permission["permissionEnabled"]);
+	/**
+	 * @param IShare $share
+	 * @param string[][] $formattedShareExtraPermissions
+	 * @return IShare modified share
+	 */
+	private function extractExtraPermissions(IShare $share, $formattedShareExtraPermissions) {
+		$shareExtraPermissions = [];
+		foreach($formattedShareExtraPermissions as $formattedPermission) {
+			$permissionEnabled = json_decode($formattedPermission["permissionEnabled"]);
 			if ($permissionEnabled === true) {
-				$shareExtraPermissions->addExtraPermission($permission["appId"], $permission["permissionName"]);
+				$permission = $this->extraSharePermissionsManager->newPermission();
+				$permission->setId($formattedPermission["permissionName"])
+					->setApp($formattedPermission["appId"]);
+				$shareExtraPermissions[] = $permission;
 			}
 		}
 
-		return $shareExtraPermissions;
+		$share->setExtraPermissions($shareExtraPermissions);
+		return $share;
 	}
 
 	/**
-	 * Format extra permissions by merging \OC\Share20\Share extra permissions
+	 * Format extra permissions by merging IShare extra permissions
 	 * with extra permissions registered with \OCP\Share\IManager
 	 *
 	 * @param IShare $share
 	 * @return array
 	 */
 	private function formatExtraPermissions(IShare $share) {
+		$shareExtraPermissions = $share->getExtraPermissions();
+		$extraPermissionsMap = [];
+		foreach($shareExtraPermissions as $perm) {
+			$extraPermissionsMap[$perm->getApp()][$perm->getId()] = true;
+		}
+
 		$formattedShareExtraPermissions = [];
+		$registeredApps = $this->extraSharePermissionsManager->getExtraPermissionApps();
+		foreach($registeredApps as $app) {
+			$registeredPermissions = $this->extraSharePermissionsManager->getExtraPermissionKeys($app);
+			foreach($registeredPermissions as $permissionName) {
+				$permission["appId"] = $app;
+				$permission["permissionName"] = $permissionName;
+				$permission["permissionLabel"] = $this->extraSharePermissionsManager->getRegisteredLabel($app, $permissionName);
+				$permission["permissionNotification"] = $this->extraSharePermissionsManager->getRegisteredDescription($app, $permissionName);
+				$permission["permissionEnabled"] = array_key_exists($app, $extraPermissionsMap) &&
+					array_key_exists($permissionName, $extraPermissionsMap[$app]);
 
-		if ($share instanceof \OC\Share20\Share) {
-			$registeredApps = $this->extraSharePermissionsManager->getExtraPermissionApps();
-			foreach($registeredApps as $app) {
-				$registeredPermissions = $this->extraSharePermissionsManager->getExtraPermissionKeys($app);
-				foreach($registeredPermissions as $permissionName) {
-					$permission["appId"] = $app;
-					$permission["permissionName"] = $permissionName;
-					$permission["permissionLabel"] = $this->extraSharePermissionsManager->getExtraPermissionLabel($app, $permissionName);
-					$permission["permissionNotification"] = $this->extraSharePermissionsManager->getExtraPermissionNotification($app, $permissionName);
-					$permission["permissionEnabled"] = $share->getExtraPermissions()->hasExtraPermission($app, $permissionName);
-
-					$formattedShareExtraPermissions[] = $permission;
-				}
+				$formattedShareExtraPermissions[] = $permission;
 			}
 		}
 
@@ -884,11 +897,8 @@ class Share20OcsController extends OCSController {
 			return new Result(null, 400, $this->l->t('Cannot remove all permissions'));
 		}
 
-		if ($share instanceof \OC\Share20\Share) {
-			$formattedExtraPermissions = $this->request->getParam('extraPermissions', null);
-			$extraPermissions = $this->extractExtraPermissions($formattedExtraPermissions);
-			$share->setExtraPermissions($extraPermissions);
-		}
+		$formattedExtraPermissions = $this->request->getParam('extraPermissions', []);
+		$share = $this->extractExtraPermissions($share, $formattedExtraPermissions);
 
 		try {
 			$share = $this->shareManager->updateShare($share);
