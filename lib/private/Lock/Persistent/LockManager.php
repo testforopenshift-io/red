@@ -49,9 +49,9 @@ class LockManager {
 			throw new \InvalidArgumentException('No token provided in $lockInfo');
 		}
 
-		// We're making the lock timeout 30 minutes
+		// We're making the lock timeout 30 minutes, even if infinite (-1) was specified
 		$timeout = 30*60;
-		if (isset($lockInfo['timeout'])) {
+		if (isset($lockInfo['timeout']) && $lockInfo['timeout'] >= 0) {
 			$timeout = $lockInfo['timeout'];
 		}
 		$owner = $lockInfo['owner'] ?? null;

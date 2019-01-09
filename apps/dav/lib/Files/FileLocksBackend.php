@@ -92,7 +92,7 @@ class FileLocksBackend implements BackendInterface {
 			} else {
 				$lockInfo->scope = Locks\LockInfo::SHARED;
 			}
-			$lockInfo->timeout = $lock->getTimeout();
+			$lockInfo->timeout = $lock->getTimeout() - (\OC::$server->getTimeFactory()->getTime() - $lock->getCreatedAt());
 
 			$davLocks[] = $lockInfo;
 		}
@@ -126,7 +126,8 @@ class FileLocksBackend implements BackendInterface {
 			'token' => $lockInfo->token,
 			'scope' => $lockInfo->scope === Locks\LockInfo::EXCLUSIVE ? ILock::LOCK_SCOPE_EXCLUSIVE : ILock::LOCK_SCOPE_SHARED,
 			'depth' => $lockInfo->depth,
-			'owner' => $lockInfo->owner
+			'owner' => $lockInfo->owner,
+			'timeout' => $lockInfo->timeout
 		]);
 	}
 

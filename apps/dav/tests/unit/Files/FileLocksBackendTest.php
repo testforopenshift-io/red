@@ -27,6 +27,7 @@ use OCA\DAV\Files\FileLocksBackend;
 use OCP\Files\FileInfo;
 use OCP\Files\Storage\IPersistentLockingStorage;
 use OCP\Files\Storage\IStorage;
+use OCP\AppFramework\Utility\ITimeFactory;
 use OCP\Lock\Persistent\ILock;
 use Sabre\DAV\Exception\NotFound;
 use Sabre\DAV\IFile;
@@ -35,6 +36,9 @@ use Sabre\DAV\Tree;
 use Test\TestCase;
 
 class FileLocksBackendTest extends TestCase {
+
+	const CREATION_TIME = 164419200;
+	const CURRENT_TIME = 164419800;
 
 	/** @var FileLocksBackend */
 	private $plugin;
@@ -47,6 +51,10 @@ class FileLocksBackendTest extends TestCase {
 		parent::setUp();
 
 		$this->storageOfFileToBeLocked = $this->createMock([IPersistentLockingStorage::class, IStorage::class]);
+
+		$this->timeFactory = $this->createMock(ITimeFactory::class);
+		$this->overwriteService('TimeFactory', $this->timeFactory);
+		$this->timeFactory->method('getTime')->willReturn(self::CURRENT_TIME);
 
 		$this->tree = $this->createMock(Tree::class);
 		$this->tree->method('getNodeForPath')->willReturnCallback(function ($uri) {
@@ -76,8 +84,8 @@ class FileLocksBackendTest extends TestCase {
 					$lock->setAbsoluteDavPath('locked-file.txt');
 					$lock->setDavUserId('alice');
 					$lock->setOwner('Alice Wonder');
-					$lock->setTimeout(1234);
-					$lock->setCreatedAt(164419200);
+					$lock->setTimeout(1000);
+					$lock->setCreatedAt(self::CREATION_TIME);
 					return [
 						$lock
 					];
@@ -118,8 +126,8 @@ class FileLocksBackendTest extends TestCase {
 		$lockInfo->scope = LockInfo::EXCLUSIVE;
 		$lockInfo->uri = 'files/alice/locked-file.txt';
 		$lockInfo->owner = 'Alice Wonder';
-		$lockInfo->timeout = 1234;
-		$lockInfo->created = 164419200;
+		$lockInfo->timeout = 400;
+		$lockInfo->created = self::CREATION_TIME;
 		$this->assertEquals([
 			$lockInfo
 		], $locks);
@@ -130,8 +138,8 @@ class FileLocksBackendTest extends TestCase {
 		$lockInfo->token = '123-456-7890';
 		$lockInfo->scope = LockInfo::SHARED;
 		$lockInfo->owner = 'Alice Wonder';
-		$lockInfo->timeout = 1234;
-		$lockInfo->created = 164419200;
+		$lockInfo->timeout = 800;
+		$lockInfo->created = self::CREATION_TIME;
 
 		$this->assertFalse($this->plugin->lock('unknown-file.txt', $lockInfo));
 		$this->assertFalse($this->plugin->lock('not-a-owncloud-file.txt', $lockInfo));
@@ -144,7 +152,8 @@ class FileLocksBackendTest extends TestCase {
 				'token' => '123-456-7890',
 				'scope' => ILock::LOCK_SCOPE_SHARED,
 				'depth' => 0,
-				'owner' => 'Alice Wonder'
+				'owner' => 'Alice Wonder',
+				'timeout' => 800,
 			])
 			->willReturn(true);
 		$this->assertTrue($this->plugin->lock('file-to-be-locked.txt', $lockInfo));
@@ -155,8 +164,8 @@ class FileLocksBackendTest extends TestCase {
 		$lockInfo->token = '123-456-7890';
 		$lockInfo->scope = LockInfo::SHARED;
 		$lockInfo->owner = 'Alice Wonder';
-		$lockInfo->timeout = 1234;
-		$lockInfo->created = 164419200;
+		$lockInfo->timeout = 400;
+		$lockInfo->created = self::CREATION_TIME;
 
 		$this->assertFalse($this->plugin->unlock('unknown-file.txt', $lockInfo));
 		$this->assertFalse($this->plugin->unlock('not-a-owncloud-file.txt', $lockInfo));
